@@ -1,0 +1,68 @@
+- name: Set up AD server
+  hosts: adserver
+  vars:
+    dc_hostname: "adserver"
+    domain_name: "ad.test"
+  tasks:
+    - name: Disable Windows firewall
+      win_firewall:
+        state: disabled
+        profiles:
+          - Domain
+          - Private
+          - Public
+      tags: disable_firewall
+    - name: Change hostname
+      win_hostname:
+        name: '{{ dc_hostname }}'
+      register: res
+    - name: Reboot
+      win_reboot:
+      when: res.reboot_required
+    - name: Install AD Domain Services
+      win_feature:
+        name: Ad-Domain-Services
+        include_management_tools: yes
+        include_sub_features: yes
+        state: present
+      register: res
+    - name: Reboot
+      win_reboot:
+      when: res.reboot_required
+    - name: Create domain
+      win_domain:
+        dns_domain_name: '{{ domain_name }}'
+        safe_mode_password: Secret123
+      register: res
+    - name: Reboot
+      win_reboot:
+        msg: "Installing AD.  Rebooting..."
+      when: res.changed
+    - name: Set up user and keytab
+      win_shell: | 
+        $pw = ConvertTo-SecureString -AsPlainText -Force -String Secret123
+        new-aduser svcuser -AccountPassword $pw -PasswordNeverExpires $true `
+            -Enabled $true -KerberosEncryptionType AES256
+        ktpass -out svc.keytab -princ svc/adserver.ad.test@AD.TEST `
+            -mapuser svcuser -crypto AES256-SHA1 +rndpass `
+            -ptype KRB5_NT_PRINCIPAL -target AD.TEST
+        certutil -encode svc.keytab tmp
+        findstr -v -c:- tmp > svc.keytab.b64
+        rm tmp
+        cat svc.keytab.b64
+      args:
+        creates: svc.keytab.b64
+        error_action: stop
+    - name: Set up constrained delegation?
+      win_shell: |
+        $user = get-aduser svcuser -properties "msDS-AllowedToDelegateTo"
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test@AD.TEST" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver@AD.TEST" }
+      args:
+        error_action: stop
