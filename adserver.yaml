@@ -35,14 +35,16 @@
         safe_mode_password: Secret123
       register: res
     - name: Reboot
-      win_reboot:
-        msg: "Installing AD.  Rebooting..."
+      ansible.windows.win_reboot:
+        test_command:
+          'exit (Get-Service -Name ADWS).Status -ne "Running"'
       when: res.changed
     - name: Set up user and keytab
-      win_shell: | 
+      win_shell: |
         $pw = ConvertTo-SecureString -AsPlainText -Force -String Secret123
-        new-aduser svcuser -AccountPassword $pw -PasswordNeverExpires $true `
-            -Enabled $true -KerberosEncryptionType AES256
+        new-aduser svcuser -server adserver -AccountPassword $pw `
+            -PasswordNeverExpires $true -Enabled $true `
+            -KerberosEncryptionType AES256
         ktpass -out svc.keytab -princ svc/adserver.ad.test@AD.TEST `
             -mapuser svcuser -crypto AES256-SHA1 +rndpass `
             -ptype KRB5_NT_PRINCIPAL -target AD.TEST
