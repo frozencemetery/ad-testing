@@ -39,41 +39,53 @@
         test_command:
           'exit (Get-Service -Name ADWS).Status -ne "Running"'
       when: res.changed
-    - name: Set up user and keytab
+    - name: Set up first service user and keytab
       win_shell: |
         $pw = ConvertTo-SecureString -AsPlainText -Force -String Secret123
-        new-aduser svcuser -server adserver -AccountPassword $pw `
+        new-aduser svcuser1 -server adserver -AccountPassword $pw `
             -PasswordNeverExpires $true -Enabled $true `
             -KerberosEncryptionType AES256
-        ktpass -out svc.keytab -princ svc/adserver.ad.test@AD.TEST `
-            -mapuser svcuser -crypto AES256-SHA1 +rndpass `
+        if (-not $?) { throw "PAIN AND SUFFERING" }
+        ktpass -out svc1.keytab -princ svc1/adserver.ad.test@AD.TEST `
+            -mapuser svcuser1 -crypto AES256-SHA1 +rndpass `
             -ptype KRB5_NT_PRINCIPAL -target AD.TEST
-        certutil -encode svc.keytab tmp
-        findstr -v -c:- tmp > svc.keytab.b64
+        if (-not $?) { throw "PAIN AND SUFFERING" }
+        certutil -encode svc1.keytab tmp
+        findstr -v -c:- tmp > svc1.keytab.b64
         rm tmp
-        cat svc.keytab.b64
+        cat svc1.keytab.b64
       args:
-        creates: svc.keytab.b64
+        creates: svc1.keytab.b64
+        error_action: stop
+    - name: Set up second service user and keytab
+      win_shell: |
+        $pw = ConvertTo-SecureString -AsPlainText -Force -String Secret123
+        new-aduser svcuser2 -server adserver -AccountPassword $pw `
+            -PasswordNeverExpires $true -Enabled $true `
+            -KerberosEncryptionType AES256
+        if (-not $?) { throw "PAIN AND SUFFERING" }
+        ktpass -out svc2.keytab -princ svc2/adserver.ad.test@AD.TEST `
+            -mapuser svcuser2 -crypto AES256-SHA1 +rndpass `
+            -ptype KRB5_NT_PRINCIPAL -target AD.TEST
+        if (-not $?) { throw "PAIN AND SUFFERING" }
+        certutil -encode svc2.keytab tmp
+        findstr -v -c:- tmp > svc2.keytab.b64
+        rm tmp
+        cat svc2.keytab.b64
+      args:
+        creates: svc2.keytab.b64
         error_action: stop
     - name: Set up constrained delegation
       win_shell: |
-        $user = get-aduser svcuser
+        $user = get-aduser svcuser1
         set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test" }
+            -add @{ "msDS-AllowedToDelegateTo" = "svc2/adserver.ad.test" }
         set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver" }
+            -add @{ "msDS-AllowedToDelegateTo" = "svc2/adserver" }
         set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test@AD.TEST" }
+            -add @{ "msDS-AllowedToDelegateTo" = "svc2/adserver.ad.test@AD.TEST" }
         set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "http/adserver@AD.TEST" }
-        set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver.ad.test" }
-        set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver" }
-        set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver.ad.test@AD.TEST" }
-        set-adobject $user `
-            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver@AD.TEST" }
+            -add @{ "msDS-AllowedToDelegateTo" = "svc2/adserver@AD.TEST" }
         set-ADAccountControl $user -TrustedToAuthForDelegation $true `
             -TrustedForDelegation $false
         echo "done" > cd_done
