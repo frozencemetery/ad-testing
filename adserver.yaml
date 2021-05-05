@@ -55,9 +55,9 @@
       args:
         creates: svc.keytab.b64
         error_action: stop
-    - name: Set up constrained delegation?
+    - name: Set up constrained delegation
       win_shell: |
-        $user = get-aduser svcuser -properties "msDS-AllowedToDelegateTo"
+        $user = get-aduser svcuser
         set-adobject $user `
             -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test" }
         set-adobject $user `
@@ -66,5 +66,17 @@
             -add @{ "msDS-AllowedToDelegateTo" = "http/adserver.ad.test@AD.TEST" }
         set-adobject $user `
             -add @{ "msDS-AllowedToDelegateTo" = "http/adserver@AD.TEST" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver.ad.test" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver.ad.test@AD.TEST" }
+        set-adobject $user `
+            -add @{ "msDS-AllowedToDelegateTo" = "host/adserver@AD.TEST" }
+        set-ADAccountControl $user -TrustedToAuthForDelegation $true `
+            -TrustedForDelegation $false
+        echo "done" > cd_done
       args:
+        creates: cd_done
         error_action: stop
