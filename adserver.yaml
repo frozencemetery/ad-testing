@@ -132,3 +132,10 @@
       args:
         creates: cd_done
         error_action: stop
+    - name: Oh boy DNS time
+      win_shell: |
+        dnscmd 127.0.0.1 /ZoneAdd ipa.test /Forwarder 192.168.3.3
+        echo "done" > dns_done
+      args:
+        creates: dns_done
+        error_action: stop
