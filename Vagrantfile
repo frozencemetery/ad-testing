@@ -41,10 +41,19 @@ ipa-server-install -NU -r $REALM -p $PASS -a $PASS \
 
 echo "192.168.3.2 adserver adserver.ad.test" > /etc/hosts
 
+echo "${PASS}" | kinit admin
+ipa-adtrust-install -U --netbios-name=$NETBIOS -a $PASS
+
+cat > /etc/krb5.conf.d/ad_test <<EOF
+[realms]
+AD.TEST = {
+    kdc = adserver.ad.test
+}
+EOF
+
 cat >> install_trust.sh <<EOF
 #!/bin/bash
 echo "${PASS}" | kinit admin
-ipa-adtrust-install -U --netbios-name=$NETBIOS -a $PASS
 echo "vagrant" | ipa trust-add --type=ad ad.test --admin vagrant --password
 EOF
 chmod +x install_trust.sh
