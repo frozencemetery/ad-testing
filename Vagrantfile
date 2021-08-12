@@ -31,7 +31,8 @@ dnf -y distro-sync --downloadonly
 dnf -yC distro-sync || true
 
 dnf -y install psmisc gdb valgrind git emacs-nox tmux gdb strace nmap \
-    ltrace lsof ipa-server{,-dns,-trust-ad} krb5-{libs,workstation,server}
+    ltrace lsof ipa-server{,-dns,-trust-ad} krb5-{libs,workstation,server} \
+    sssd-winbind-idmap
 
 dnf -y debuginfo-install krb5-{libs,workstation,server} ipa-server
 
