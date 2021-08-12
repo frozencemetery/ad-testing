@@ -37,10 +37,15 @@ dnf -y install psmisc gdb valgrind git emacs-nox tmux gdb strace nmap \
 dnf -y debuginfo-install krb5-{libs,workstation,server} ipa-server
 
 hostnamectl set-hostname $HOSTNAME
+
+cat > /etc/hosts <<EOF
+127.0.0.1 localhost
+192.168.3.3 $HOSTNAME
+192.168.3.2 adserver adserver.ad.test
+EOF
+
 ipa-server-install -NU -r $REALM -p $PASS -a $PASS \
     --setup-dns --auto-forwarders --auto-reverse
-
-echo "192.168.3.2 adserver adserver.ad.test" > /etc/hosts
 
 echo "${PASS}" | kinit admin
 ipa-adtrust-install -U --netbios-name=$NETBIOS -a $PASS
@@ -51,6 +56,8 @@ AD.TEST = {
     kdc = adserver.ad.test
 }
 EOF
+
+ipa dnsforwardzone-add ad.test --forwarder=192.168.3.2 --forward-policy=only
 
 cat >> install_trust.sh <<EOF
 #!/bin/bash
